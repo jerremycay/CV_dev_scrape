@@ -1,0 +1,3 @@
+I, [2011-09-18T04:19:57.741801 #55804]  INFO -- : run start.
+I, [2011-09-18T04:20:14.024395 #55804]  INFO -- : Finished retrieving all schools data!
+I, [2011-09-18T04:20:14.040958 #55804]  INFO -- : Finished running in scrape_idc.
