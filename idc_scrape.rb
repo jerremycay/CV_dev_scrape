@@ -28,7 +28,7 @@ class IdcScraper < Scraper
     puts "IdcScraper was initialized."
   end
   
-  def retrieve_url(url, max_tries=8, sleep_sec_before=1.4, sleep_sec_on_failure=62)
+  def retrieve_url(url, max_tries=15, sleep_sec_before=1.4, sleep_sec_on_failure=72)
     try = 0
     sleep sleep_sec_before
     begin
@@ -38,8 +38,8 @@ class IdcScraper < Scraper
     rescue => exception
       exception_data = "\n\n#{exception.class}: #{exception.message}\n    from " + exception.backtrace.join("\n    from ") + "\n\n"
       if try.to_i < max_tries 
-        @scrape_logger.warn("Couldn't fatch url #{url} on #{try} try. Sleeping for 40seconds and retrying...")
-        sleep 10
+        @scrape_logger.warn("Couldn't fatch url #{url} on #{try} try. Sleeping for #{sleep_sec_on_failure} seconds and retrying...")
+        sleep sleep_sec_on_failure
         @scrape_logger.debug("Woke up and retrying...")
         retry
       else
@@ -60,6 +60,12 @@ class IdcScraper < Scraper
     return school_options
   end
   
+  
+  
+  
+  # The next 7 funcs are to retrirve select course under by school option. They are not implemented
+  
+  
   def query_and_parse_ajax(queried_param,school,year="-1",semester="-1",program="-1")
     base_url = "http://www.idc.ac.il/yedion/GetAJAXData.aspx?"
     params = "prm=#{queried_param}&schl=#{school}&acYear=#{year}&smstr=#{semester}&grp=#{program}&yY=2012&lng=heb"
@@ -74,6 +80,7 @@ class IdcScraper < Scraper
     @scrape_logger.debug("Ajax built data is: " + hashes_arr)
     return hashes_arr
   end
+  
   
   # Example http://www.idc.ac.il/yedion/GetAJAXData.aspx?prm=year&schl=80&acYear=-1&smstr=-1&grp=-1&yY=2012&lng=heb
   def get_years_list(school)
@@ -101,7 +108,8 @@ class IdcScraper < Scraper
   def get_degree_list(school, year, semester, department, internship)
     @scrape_logger.warn("Unimplemented function get_degree_list was called!")
   end
-  
+ 
+ # returns all of the school options. not used at the moment... 
  def get_all_form_school_hirerchy
    school_options = get_school_list()
     school_options.each do |school|
@@ -127,6 +135,7 @@ class IdcScraper < Scraper
     return school_options
  end
  
+ # Returns the courses of a school
  def get_school_courses(school_val)
    school_field = @main_form.field_with(:name => "ddlSchool")
    school_field.value = school_val
@@ -141,9 +150,9 @@ class IdcScraper < Scraper
      course_url_param = /Ctrl\((\d+),/.match(course_on_click)[1]
      courses_arr << {:number => course_num, :full_name => course_full_name, :url_param => course_url_param}
    end
-   @scrape_logger.debug("school #{school_val} has #{courses_arr.length} courses.") #to do remove!
-   @scrape_logger.debug("First course data: #{courses_arr[0]}") #to do remove!
-   @scrape_logger.debug("Last course data: #{courses_arr[0]}") #to do remove!
+   @scrape_logger.debug("method #{__method__} returning for school #{school_val} total of #{courses_arr.length} courses summaries.") #to do remove!
+   @scrape_logger.debug("method #{__method__} first course instruction data: #{courses_arr[0]}") #to do remove!
+   @scrape_logger.debug("method #{__method__} last course instruction data: #{courses_arr[-1]}") #to do remove!
    return courses_arr
  end
  
@@ -152,7 +161,7 @@ class IdcScraper < Scraper
     base_url = "http://www.idc.ac.il/yedion/CourseDetails.aspx?"
     params = "yY=2012&lng=#{lng}&grp=#{group_id}&crs=#{course_id}&smstr=#{semester}&dgr=-1&schl=#{school_id}&year=#{year}&crsTp=-1&fclt=-1&prgrm=-1&day=-1&frmH=-1&frmM=-1&tH=-1&tM=-1"
     url = base_url + params
-    @scrape_logger.debug("The generated course page url is - " + url) #to do remove!
+    @scrape_logger.debug("q=#{@query_counter}- The generated course page url is - #{url}") #to do remove!
     return retrieve_url(url)
   end
  
@@ -205,7 +214,9 @@ class IdcScraper < Scraper
      end
    end
    
-   # Ignoring course prerequisites
+   # Ignoring course prerequisites - not retrieving it...
+   
+   
    course_data[:description] = page.at_css("#txtCourseDesc").text.strip
    course_data[:site] = page.at_css("#hlCourseSite").text.strip
 
@@ -231,27 +242,29 @@ class IdcScraper < Scraper
    def insert_schools_data_to_db(schools) 
    end
    
-   def serialize_schools(schools)
-     File.open('serialized_schools', 'w+') do |f|
+   def serialize_schools(schools, serialization_file = "serialized_schools")
+     File.open(serialization_file, 'w+') do |f|
         Marshal.dump(schools,f)
       end
    end
    
-   def deserialize_schools
+   def deserialize_schools(serialization_file = "serialized_schools")
      schools = []
-     File.open('serialized_schools', 'r') do |f|
+     File.open(serialization_file, 'r') do |f|
          schools = Marshal.load(f)
      end
      return schools
    end
    
-   
-   def scrape_idc
+   # Class entry point.
+   # Because the scrape sometimes collapses, because of UNIVERSITY problems, we must allow starting from a spacific ordinal school and finishing
+   # on some othe ordinal.
+   # For example, scrape_idc(2,2) - will query only the 3rd school...
+   # send a serialization_file to change to default (serialized_schools) serialization file.
+   def scrape_idc(start_from_school_ord=0, end_with_school_ord = -1, serialization_file = nil)
      begin
        schools = get_school_list()
-       schools.each do |school|
-#       If only 1 school with few courses is wanted..
-#        schools[1..1].each do |school|
+       schools[start_from_school_ord..end_with_school_ord].each do |school|
          school[:courses] = get_school_courses(school[:value])
          @scrape_logger.info("Retrieving data of school #{school[:name]}(#{school[:value]}) for #{school[:courses].length} courses")
          school[:courses].each do |course|
@@ -273,8 +286,8 @@ class IdcScraper < Scraper
        raise
        
      ensure
-       serialize_schools(schools)
-     end
+       (nil == serialization_file) ? serialize_schools(schools) : serialize_schools(schools, serialization_file)
+       end
    end
   
 end

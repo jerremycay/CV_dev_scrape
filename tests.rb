@@ -6,20 +6,35 @@
 #    str_hash = {:name => "עופר", :last => "בן- נון"}
 #    return str_hash.inspect.to_s
 #end
+##########
+#scrape user data
+##########
 
+
+
+
+
+
+
+
+
+
+
+##########
+#scrape_idc
+##########
 
 # Was inside the class!!
 def console_funcs
   require "idc_scrape"    
   scr = IdcScraper.new
   
-  schools = scr.scrape_idc
+  schools = scr.scrape_idc(0,-1, "serialized_schools_1")
   course_data = scr.retrieve_course_data("121005201", "52", "30", "1", "1")
   scr.scrape_logger.debug(course_data)
   
   course_data = scr.parse_course_page(course_page)
   school_field = scr.main_form.field_with(:name => "ddlSchool")
-  
 end
 
 
@@ -103,4 +118,9 @@ def test_range
   arr[0..1].each do |let|
     puts let
   end
+end
+
+
+def test_param(a = "1", b="2", c= "3")
+  puts a+b+c
 end
